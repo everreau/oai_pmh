@@ -34,15 +34,22 @@ $records = [];
 $deleted = [];
 $timestamps = [];
 $earliest = time();
+$sets = [];
 
 foreach ($config['metadataPrefix'] as $prefix => $uris) {
-    $files = glob(rtrim($config['dataDirectory'], '/').'/'.$prefix.'/*.xml');
-    foreach ($files as $file) {
-        $records[$prefix][pathinfo($file, PATHINFO_FILENAME)] = $file;
-        $deleted[$prefix][pathinfo($file, PATHINFO_FILENAME)] = !filesize($file);
-        $timestamps[$prefix][filemtime($file)][] = pathinfo($file, PATHINFO_FILENAME);
-        if (filemtime($file) < $earliest) {
-            $earliest = filemtime($file);
+    $dirs = glob(rtrim($config['dataDirectory'], '/').'/'.$prefix.'/*', GLOB_ONLYDIR);
+    foreach ($dirs as $dir) {
+        $files = glob($dir.'/*.xml');
+        $sets[$dir] = [];
+        foreach ($files as $file) {
+            $records[$prefix][pathinfo($file, PATHINFO_FILENAME)] = $file;
+            $deleted[$prefix][pathinfo($file, PATHINFO_FILENAME)] = !filesize($file);
+            $timestamps[$prefix][filemtime($file)][] = pathinfo($file, PATHINFO_FILENAME);
+            $set = explode("/", $dir)[3];
+            $sets[$set][] = pathinfo($file, PATHINFO_FILENAME);
+            if (filemtime($file) < $earliest) {
+                $earliest = filemtime($file);
+            }
         }
     }
     ksort($records[$prefix]);
@@ -77,6 +84,7 @@ $oai2 = new Server(
     [
         'GetRecord' => function ($identifier, $metadataPrefix) {
             global $records, $deleted;
+            $identifier = array_slice(explode("/", $identifier), -1)[0];
             if (empty($records[$metadataPrefix][$identifier])) {
                 return [];
             } else {
@@ -88,18 +96,20 @@ $oai2 = new Server(
                 ];
             }
         },
-        'ListRecords' => function ($metadataPrefix, $from = null, $until = null, $count = false, $deliveredRecords = 0, $maxItems = 100) {
-            global $records, $deleted, $timestamps;
+        'ListRecords' => function ($metadataPrefix, $set, $from = null, $until = null, $count = false, $deliveredRecords = 0, $maxItems = 100) {
+            global $records, $deleted, $timestamps, $sets;
             $resultSet = [];
             foreach ($timestamps[$metadataPrefix] as $timestamp => $identifiers) {
                 if ((is_null($from) || $timestamp >= $from) && (is_null($until) || $timestamp <= $until)) {
                     foreach ($identifiers as $identifier) {
-                        $resultSet[] = [
-                            'identifier' => $identifier,
-                            'timestamp' => filemtime($records[$metadataPrefix][$identifier]),
-                            'deleted' => $deleted[$metadataPrefix][$identifier],
-                            'metadata' => $records[$metadataPrefix][$identifier]
-                        ];
+                        if (is_null($set) || (array_key_exists(strval($set), $sets) && in_array($identifier, $sets[strval($set)]))) {
+                            $resultSet[] = [
+                                'identifier' => $identifier,
+                                'timestamp' => filemtime($records[$metadataPrefix][$identifier]),
+                                'deleted' => $deleted[$metadataPrefix][$identifier],
+                                'metadata' => $records[$metadataPrefix][$identifier]
+                            ];
+                        }
                     }
                 }
             }

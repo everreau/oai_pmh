@@ -174,6 +174,7 @@
       <ul>
         <li>&#187; <a class="link" href="?verb=Identify">Identify</a></li>
         <li>&#187; <a class="link" href="?verb=ListMetadataFormats">ListMetadataFormats</a></li>
+        <li>&#187; <a class="link" href="?verb=ListSets">ListSets</a></li>
         <xsl:if test="$identifier">
           <li>&#187; <a class="link" href="?verb=ListMetadataFormats&amp;identifier={$identifier}">ListMetadataFormats (<em><xsl:value-of select="$identifier"/></em>)</a></li>
         </xsl:if>
@@ -220,6 +221,7 @@
         <p>The request was completed with the following results.</p>
         <div class="results">
           <xsl:apply-templates select="oai:Identify" />
+          <xsl:apply-templates select="oai:ListSets" />
           <xsl:apply-templates select="oai:ListMetadataFormats"/>
           <xsl:apply-templates select="oai:ListIdentifiers"/>
           <xsl:apply-templates select="oai:ListRecords"/>
@@ -265,6 +267,25 @@ Identify
       </table>
     </li>
   </ol>
+</xsl:template>
+
+<!--
+  ListSets
+-->
+<xsl:template match="oai:ListSets">
+  <ol>
+    <xsl:apply-templates select="oai:set"/>
+  </ol>
+</xsl:template>
+
+<xsl:template match="oai:set">
+  <li>
+    <h3><xsl:value-of select="oai:setName"/> [<xsl:value-of select="oai:setSpec"/>]</h3>
+    <ul>
+      <li>&#187; <a class="link" href="?verb=ListIdentifiers&amp;metadataPrefix=oai_dc&amp;set={oai:setSpec}">ListIdentifiers</a></li>
+      <li>&#187; <a class="link" href="?verb=ListRecords&amp;metadataPrefix=oai_dc&amp;set={oai:setSpec}">ListRecords</a></li>
+    </ul>
+  </li>
 </xsl:template>
 
 <!--

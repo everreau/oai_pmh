@@ -116,7 +116,8 @@ class Server {
                 $this->errors[] = new Exception('badResumptionToken');
             }
         } else {
-            $this->errors[] = new Exception('noSetHierarchy');
+            $contents = file_get_contents("../data/sets.xml");
+            $this->response->doc->loadXML($contents);
         }
     }
 
@@ -132,10 +133,11 @@ class Server {
         if (empty($this->errors)) {
             try {
                 if ($record = call_user_func($this->getRecordCallback, $this->args['identifier'], $this->args['metadataPrefix'])) {
-                    $cur_record = $this->response->addToVerbNode('record');
-                    $this->response->createHeader($record['identifier'], $this->formatDatestamp($record['timestamp']), $record['deleted'], $cur_record);
                     if (!$record['deleted']) {
-                        $this->addMetadata($cur_record, $record['metadata']);
+                        $this->response->appendNodeToVerb($this->getMetadata($record['metadata'], 'record'));
+                    }
+                    else{
+                        $this->response->appendNodeToVerb($this->getMetadata($record['metadata'], 'header'));
                     }
                 } else {
                     $this->errors[] = new Exception('idDoesNotExist');
@@ -156,6 +158,7 @@ class Server {
         $metadataPrefix = isset($this->args['metadataPrefix']) ? $this->args['metadataPrefix'] : '';
         $from = isset($this->args['from']) ? $this->args['from'] : '';
         $until = isset($this->args['until']) ? $this->args['until'] : '';
+        $set = isset($this->args['set']) ? $this->args['set'] : NULL;
         if (isset($this->args['resumptionToken'])) {
             if (count($this->args) > 1) {
                 $this->errors[] = new Exception('badArgument');
@@ -193,24 +196,22 @@ class Server {
                     $this->errors[] = new Exception('badArgument');
                 }
             }
-            if (isset($this->args['set'])) {
-                $this->errors[] = new Exception('noSetHierarchy');
-            }
         }
         if (empty($this->errors)) {
             try {
-                if (!($records_count = call_user_func($this->listRecordsCallback, $metadataPrefix, $this->formatTimestamp($from), $this->formatTimestamp($until), true))) {
+                if (!($records_count = call_user_func($this->listRecordsCallback, $metadataPrefix, $set, $this->formatTimestamp($from), $this->formatTimestamp($until), true))) {
                     throw new Exception('noRecordsMatch');
                 }
-                $records = call_user_func($this->listRecordsCallback, $metadataPrefix, $this->formatTimestamp($from), $this->formatTimestamp($until), false, $deliveredRecords, $maxItems);
+                $records = call_user_func($this->listRecordsCallback, $metadataPrefix, $set, $this->formatTimestamp($from), $this->formatTimestamp($until), false, $deliveredRecords, $maxItems);
                 foreach ($records as $record) {
-                    $cur_record = null;
-                    if ($this->verb == 'ListRecords') { // for ListIdentifiers, only headers will be returned.
-                        $cur_record = $this->response->addToVerbNode('record');
+                    if ($record['deleted']) {
+                        $this->response->createHeader($record['identifier'], $this->formatDatestamp($record['timestamp']), $record['deleted']);
                     }
-                    $this->response->createHeader($record['identifier'], $this->formatDatestamp($record['timestamp']), $record['deleted'], $cur_record);
-                    if (!$record['deleted'] && $this->verb == 'ListRecords') { // for ListIdentifiers, only headers will be returned.
-                        $this->addMetadata($cur_record, $record['metadata']);
+                    else if ($this->verb == 'ListRecords') {
+                        $this->response->appendNodeToVerb($this->getMetadata($record['metadata'], 'record'));
+                        //$this->addMetadata($cur_record, $record['metadata']);
+                    } else if ($this->verb == 'ListIdentifiers') {
+                        $this->response->appendNodeToVerb($this->getMetadata($record['metadata'], 'header'));
                     }
                 }
                 // Will we need a new ResumptionToken?
@@ -237,6 +238,12 @@ class Server {
         $fragment = new \DOMDocument();
         $fragment->load($file);
         $this->response->importFragment($meta_node, $fragment);
+    }
+
+    private function getMetadata($file, $node) {
+        $fragment = new \DOMDocument();
+        $fragment->load($file);
+        return $this->response->getFragmentNode($fragment, $node);
     }
 
     private function createResumptionToken($deliveredRecords, $metadataPrefix, $from, $until) {

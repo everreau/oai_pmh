@@ -81,6 +81,13 @@ class Response {
         return $this->addChild($this->verbNode, $nodeName, $value);
     }
 
+    public function appendNodeToVerb($node) {
+        if (!isset($this->verbNode) && !empty($this->verb)) {
+            $this->verbNode = $this->addChild($this->doc->documentElement, $this->verb);
+        }
+        return $this->verbNode->appendChild($node);
+    }
+
     /**
      * Headers are enclosed inside of <record> to the query of ListRecords, ListIdentifiers and etc.
      *
@@ -136,4 +143,8 @@ class Response {
         return $added_node;
     }
 
+    public function getFragmentNode($fragment, $node) {
+        $records = $fragment->documentElement->getElementsByTagName($node);
+        return $this->doc->importNode($records[0], true);
+    }
 }
