@@ -123,6 +123,7 @@ $oai2 = new Server(
             global $config, $records;
             if (!empty($identifier)) {
                 $formats = [];
+                $identifier = array_slice(explode("/", $identifier), -1)[0];
                 foreach ($records as $format => $record) {
                     if (!empty($record[$identifier])) {
                         $formats[$format] = $config['metadataPrefix'][$format];
